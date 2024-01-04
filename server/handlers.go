@@ -1111,7 +1111,7 @@ func (s *Server) handlePasswordGrant(w http.ResponseWriter, r *http.Request, cli
 		switch scope {
 		case scopeOpenID:
 			hasOpenIDScope = true
-		case scopeOfflineAccess, scopeEmail, scopeProfile, scopeGroups, scopeFederatedID:
+		case scopeOfflineAccess, scopeEmail, scopeProfile, scopeGroups, scopeUserAttributes /*userattrs*/, scopeFederatedID:
 		default:
 			peerID, ok := parseCrossClientScope(scope)
 			if !ok {
@@ -1160,6 +1160,8 @@ func (s *Server) handlePasswordGrant(w http.ResponseWriter, r *http.Request, cli
 	username := q.Get("username")
 	password := q.Get("password")
 	identity, ok, err := passwordConnector.Login(r.Context(), parseScopes(scopes), username, password)
+    //fmt.Printf("ident %v\n", identity) // get back user attribute info correctly
+
 	if err != nil {
 		s.logger.Errorf("Failed to login user: %v", err)
 		s.tokenErrHelper(w, errInvalidRequest, "Could not login user", http.StatusBadRequest)
@@ -1178,7 +1180,9 @@ func (s *Server) handlePasswordGrant(w http.ResponseWriter, r *http.Request, cli
 		Email:             identity.Email,
 		EmailVerified:     identity.EmailVerified,
 		Groups:            identity.Groups,
+        UserAttributes:    identity.UserAttributes,
 	}
+    // fmt.Printf("claims %v\n", claims) // get back claim info correctly
 
 	accessToken, err := s.newAccessToken(client.ID, claims, scopes, nonce, connID)
 	if err != nil {
