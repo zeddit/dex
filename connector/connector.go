@@ -19,6 +19,9 @@ type Scopes struct {
 
 	// The client has requested group information about the end user.
 	Groups bool
+
+	// userattrs for Crowd
+	UserAttributes bool
 }
 
 // Identity represents the ID Token claims supported by the server.
@@ -30,6 +33,12 @@ type Identity struct {
 	EmailVerified     bool
 
 	Groups []string
+
+    UserAttributes map[string][]string
+    // UserAttributes []struct{
+    //     Name string
+    //     Values []string
+    // }
 
 	// ConnectorData holds data used by the connector for subsequent requests after initial
 	// authentication, such as access tokens for upstream provides.

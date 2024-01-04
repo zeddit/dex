@@ -65,6 +65,13 @@ type crowdGroups struct {
 	} `json:"groups"`
 }
 
+type crowdUserAttributes struct {
+	UserAttributes []struct {
+		Name string
+		Values []string
+	} `json:"attributes"`
+}
+
 type crowdAuthentication struct {
 	Token string
 	User  struct {
@@ -102,6 +109,7 @@ type refreshData struct {
 }
 
 func (c *crowdConnector) Login(ctx context.Context, s connector.Scopes, username, password string) (ident connector.Identity, validPass bool, err error) {
+    // fmt.Printf("%v\n", s)
 	// make this check to avoid empty passwords.
 	if password == "" {
 		return connector.Identity{}, false, nil
@@ -133,6 +141,16 @@ func (c *crowdConnector) Login(ctx context.Context, s connector.Scopes, username
 			return connector.Identity{}, false, fmt.Errorf("crowd: failed to query groups: %v", err)
 		}
 		ident.Groups = userGroups
+	}
+
+	if s.UserAttributes { /* processing userattrs scope */
+		userUserAttributes, err := c.getUserAttributes(ctx, client, s.UserAttributes, ident.Username)
+        // fmt.Printf("getUserAttributes %v\n", userUserAttributes)
+		if err != nil {
+			return connector.Identity{}, false, fmt.Errorf("crowd: failed to query attributes: %v", err)
+		}
+        // add a new type of returns
+		ident.UserAttributes = userUserAttributes
 	}
 
 	if s.OfflineAccess {
@@ -176,6 +194,15 @@ func (c *crowdConnector) Refresh(ctx context.Context, s connector.Scopes, ident 
 		}
 		newIdent.Groups = userGroups
 	}
+
+	if s.UserAttributes { /* processing userattrs scope */
+		userUserAttributes, err := c.getUserAttributes(ctx, client, s.UserAttributes, newIdent.Username)
+		if err != nil {
+			return connector.Identity{}, fmt.Errorf("crowd: failed to query attributes: %v", err)
+		}
+		newIdent.UserAttributes = userUserAttributes
+	}
+
 	return newIdent, nil
 }
 
@@ -357,6 +384,54 @@ func (c *crowdConnector) groups(ctx context.Context, client *http.Client, userna
 	return userGroups, nil
 }
 
+// userattrs retrieves user attributes from Crowd API
+func (c *crowdConnector) userAttributes(ctx context.Context, client *http.Client, username string) (map[string][]string, error) {
+    var err error
+	var crowdUserAttributes crowdUserAttributes
+
+	req, err := c.crowdUserManagementRequest(ctx,
+		"GET",
+		fmt.Sprintf("/user/attribute?username=%s", username),
+		nil,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("crowd: new user attributes api request %v", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("crowd: api request %v", err)
+	}
+	defer resp.Body.Close()
+
+	body, err := c.validateCrowdResponse(resp)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("%s: %s", resp.Status, body)
+	}
+
+	if err := json.Unmarshal(body, &crowdUserAttributes); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %v", err)
+	}
+
+    // get required information from crowd rest api response
+    // initialized map
+    userUserAttributes := make(map[string][]string)
+    for _, userattr:= range crowdUserAttributes.UserAttributes {
+        // userUserAttributes should not a dict with elem as a list, but map
+        //userUserAttributes = append(userUserAttributes, userattr)
+        //fmt.Printf("name %+v\n", userattr.Name)
+        //fmt.Printf("values %+v\n", userattr.Values)
+        userUserAttributes[userattr.Name] = userattr.Values
+    }
+    //fmt.Printf("%+v", userUserAttributes)
+
+	return userUserAttributes, nil
+}
+
 // identityFromCrowdUser converts crowdUser to Identity
 func (c *crowdConnector) identityFromCrowdUser(user crowdUser) connector.Identity {
 	identity := connector.Identity{
@@ -397,6 +472,20 @@ func (c *crowdConnector) getGroups(ctx context.Context, client *http.Client, gro
 		return filteredGroups, nil
 	} else if groupScope {
 		return crowdGroups, nil
+	}
+
+	return nil, nil
+}
+
+// getUserAttributes
+func (c *crowdConnector) getUserAttributes(ctx context.Context, client *http.Client, userAttributeScope bool, userLogin string) (map[string][]string, error) {
+	userUserAttributes, err := c.userAttributes(ctx, client, userLogin)
+	if err != nil {
+		return nil, err
+	}
+	
+    if userAttributeScope {
+		return userUserAttributes, nil
 	}
 
 	return nil, nil

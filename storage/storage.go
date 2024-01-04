@@ -181,6 +181,13 @@ type Claims struct {
 	EmailVerified     bool
 
 	Groups []string
+
+    // added to claims for crowd userattrs
+    // UserAttributes []struct{
+    //     Name string
+    //     Values []string
+    // }
+    UserAttributes map[string][]string 
 }
 
 // PKCE is a container for the data needed to perform Proof Key for Code Exchange (RFC 7636) auth flow

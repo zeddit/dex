@@ -247,6 +247,7 @@ func (s *Server) updateRefreshToken(ctx context.Context, rCtx *refreshContext) (
 		Email:             rCtx.storageToken.Claims.Email,
 		EmailVerified:     rCtx.storageToken.Claims.EmailVerified,
 		Groups:            rCtx.storageToken.Claims.Groups,
+        UserAttributes:    rCtx.storageToken.Claims.UserAttributes,
 	}
 
 	refreshTokenUpdater := func(old storage.RefreshToken) (storage.RefreshToken, error) {
@@ -306,6 +307,7 @@ func (s *Server) updateRefreshToken(ctx context.Context, rCtx *refreshContext) (
 		old.Claims.Email = ident.Email
 		old.Claims.EmailVerified = ident.EmailVerified
 		old.Claims.Groups = ident.Groups
+		old.Claims.UserAttributes = ident.UserAttributes // userattr
 
 		return old, nil
 	}
@@ -345,12 +347,14 @@ func (s *Server) handleRefreshToken(w http.ResponseWriter, r *http.Request, clie
 		s.refreshTokenErrHelper(w, rerr)
 		return
 	}
+    //fmt.Printf("getRefreshScopes: %v\n", rCtx.scopes) // right scopes
 
 	newToken, ident, rerr := s.updateRefreshToken(r.Context(), rCtx)
 	if rerr != nil {
 		s.refreshTokenErrHelper(w, rerr)
 		return
 	}
+    //fmt.Printf("getId: %v\n", ident)
 
 	claims := storage.Claims{
 		UserID:            ident.UserID,
@@ -359,6 +363,7 @@ func (s *Server) handleRefreshToken(w http.ResponseWriter, r *http.Request, clie
 		Email:             ident.Email,
 		EmailVerified:     ident.EmailVerified,
 		Groups:            ident.Groups,
+		UserAttributes:    ident.UserAttributes,
 	}
 
 	accessToken, _, err := s.newAccessToken(client.ID, claims, rCtx.scopes, rCtx.storageToken.Nonce, rCtx.storageToken.ConnectorID)

@@ -111,6 +111,7 @@ const (
 	scopeOfflineAccess     = "offline_access" // Request a refresh token.
 	scopeOpenID            = "openid"
 	scopeGroups            = "groups"
+	scopeUserAttributes    = "userattrs"
 	scopeEmail             = "email"
 	scopeProfile           = "profile"
 	scopeFederatedID       = "federated:id"
@@ -169,6 +170,8 @@ func parseScopes(scopes []string) connector.Scopes {
 			s.OfflineAccess = true
 		case scopeGroups:
 			s.Groups = true
+		case scopeUserAttributes:
+			s.UserAttributes = true
 		}
 	}
 	return s
@@ -290,6 +293,12 @@ type idTokenClaims struct {
 	EmailVerified *bool  `json:"email_verified,omitempty"`
 
 	Groups []string `json:"groups,omitempty"`
+    // serilizing to "name":str, "values":[], I want str:[]
+	// UserAttributes []struct {
+    //     Name string //`json: "name"`
+    //     Values []string //`json:"values"`
+    // } `json:"attributes,omitempty"`
+    UserAttributes map[string][]string `json:"attributes,omitempty"`
 
 	Name              string `json:"name,omitempty"`
 	PreferredUsername string `json:"preferred_username,omitempty"`
@@ -369,6 +378,8 @@ func (s *Server) newIDToken(clientID string, claims storage.Claims, scopes []str
 			tok.EmailVerified = &claims.EmailVerified
 		case scope == scopeGroups:
 			tok.Groups = claims.Groups
+		case scope == scopeUserAttributes:
+			tok.UserAttributes = claims.UserAttributes
 		case scope == scopeProfile:
 			tok.Name = claims.Username
 			tok.PreferredUsername = claims.PreferredUsername
